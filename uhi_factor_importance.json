@@ -1,0 +1,60 @@
+{
+  "factor_importance": [
+    {
+      "factor": "impervious_surface_percentage",
+      "score": 0.35318085433019103
+    },
+    {
+      "factor": "ndvi",
+      "score": 0.1837488100697609
+    },
+    {
+      "factor": "surface_albedo",
+      "score": 0.1565072583574401
+    },
+    {
+      "factor": "urban_vegetation_ratio",
+      "score": 0.0960417992687788
+    },
+    {
+      "factor": "heat_capacity_proxy",
+      "score": 0.04677800332056348
+    },
+    {
+      "factor": "population_density",
+      "score": 0.03223897725981742
+    },
+    {
+      "factor": "nighttime_lights",
+      "score": 0.024763693477690023
+    },
+    {
+      "factor": "distance_to_highway",
+      "score": 0.023313827564748892
+    },
+    {
+      "factor": "ndwi",
+      "score": 0.021389492654684712
+    },
+    {
+      "factor": "slope",
+      "score": 0.02125576617320471
+    },
+    {
+      "factor": "building_density",
+      "score": 0.021003016406693473
+    },
+    {
+      "factor": "elevation",
+      "score": 0.019778501116426515
+    }
+  ],
+  "model_metadata": {
+    "model_type": "RandomForestRegressor",
+    "training_date": "2025-09-04T16:41:45.604534",
+    "performance_metrics": {
+      "train_rmse": 0.03579782843040288,
+      "test_rmse": 0.07413997523766318,
+      "train_r2": 0.9302570096334797,
+      "test_r2": 0.7139688057422584,
+      "cv_scores": 

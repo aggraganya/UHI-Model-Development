@@ -3,7 +3,7 @@ import numpy as np
 import json
 import rasterio
 from rasterio.transform import from_bounds
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
@@ -127,8 +127,8 @@ class UrbanHeatIslandModel:
         )
         
         # Initialize model
-        if model_type == 'random_forest':
-            self.model = RandomForestRegressor(
+    
+        self.model = RandomForestRegressor(
                 n_estimators=100,
                 max_depth=15,
                 min_samples_split=5,
@@ -136,14 +136,6 @@ class UrbanHeatIslandModel:
                 random_state=42,
                 n_jobs=-1
             )
-        elif model_type == 'gradient_boosting':
-            self.model = GradientBoostingRegressor(
-                n_estimators=100,
-                max_depth=6,
-                learning_rate=0.1,
-                random_state=42
-            )
-        
         # Train model
         self.model.fit(X_train, y_train)
         
@@ -174,9 +166,9 @@ class UrbanHeatIslandModel:
         print(f"CV R² (mean): {np.mean(self.training_metrics['cv_scores']):.3f} ± {np.std(self.training_metrics['cv_scores']):.3f}")
         
         return X_test, y_test, y_pred_test
-    
+    """
     def generate_factor_importance_output(self, output_path='factor_importance.json'):
-        """Generate the factor importance ranking as specified in the requirements."""
+        
         if not self.feature_importance:
             raise ValueError("Model must be trained before generating factor importance.")
         
@@ -209,7 +201,7 @@ class UrbanHeatIslandModel:
         
         print(f"Factor importance saved to {output_path}")
         
-        return factor_importance_output
+        return factor_importance_output """
     
     def predict_uhi_intensity(self, feature_data):
         """Predict UHI intensity for new data."""
@@ -302,51 +294,129 @@ class UrbanHeatIslandModel:
         
         return highway_raster, transform
     
-    def visualize_results(self, df, predictions):
-        """Create visualizations of the results."""
-        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    def create_results_table(self, df, predictions):
+        """Create detailed results tables."""
+        print("\n" + "="*80)
+        print(" DETAILED RESULTS SUMMARY TABLE")
+        print("="*80)
         
-        # Feature importance plot
+        # Statistical summary table
+        print("\n UHI INTENSITY STATISTICS:")
+        print("-" * 50)
+        stats_data = {
+            'Metric': ['Count', 'Mean', 'Std Dev', 'Min', '25th %ile', 'Median', '75th %ile', '90th %ile', 'Max'],
+            'Value': [
+                f"{len(predictions):,}",
+                f"{np.mean(predictions):.3f}°C",
+                f"{np.std(predictions):.3f}°C", 
+                f"{np.min(predictions):.3f}°C",
+                f"{np.percentile(predictions, 25):.3f}°C",
+                f"{np.median(predictions):.3f}°C",
+                f"{np.percentile(predictions, 75):.3f}°C",
+                f"{np.percentile(predictions, 90):.3f}°C",
+                f"{np.max(predictions):.3f}°C"
+            ]
+        }
+        
+        stats_df = pd.DataFrame(stats_data)
+        print(stats_df.to_string(index=False, justify='left'))
+        
+        # Feature importance table
         if self.feature_importance:
-            features = list(self.feature_importance.keys())
-            scores = list(self.feature_importance.values())
+            print(f"\n🏆 FEATURE IMPORTANCE RANKING:")
+            print("-" * 50)
             
-            axes[0, 0].barh(features, scores)
-            axes[0, 0].set_xlabel('Importance Score')
-            axes[0, 0].set_title('Feature Importance Rankings')
-            axes[0, 0].grid(True, alpha=0.3)
+            # Create importance table
+            importance_data = []
+            sorted_importance = sorted(self.feature_importance.items(), 
+                                     key=lambda x: abs(x[1]), reverse=True)
+            
+            for rank, (feature, score) in enumerate(sorted_importance, 1):
+                importance_data.append({
+                    'Rank': rank,
+                    'Feature': feature.replace('_', ' ').title(),
+                    'Score': f"{score:.4f}",
+                    'Impact': 'Positive' if score > 0 else 'Negative',
+                    'Magnitude': 'High' if abs(score) > 0.2 else 'Medium' if abs(score) > 0.05 else 'Low'
+                })
+            
+            importance_df = pd.DataFrame(importance_data)
+            print(importance_df.to_string(index=False, justify='left'))
         
-        # UHI intensity distribution
-        axes[0, 1].hist(predictions, bins=30, alpha=0.7, edgecolor='black')
-        axes[0, 1].set_xlabel('UHI Intensity (°C)')
-        axes[0, 1].set_ylabel('Frequency')
-        axes[0, 1].set_title('Distribution of Predicted UHI Intensity')
-        axes[0, 1].grid(True, alpha=0.3)
+        # Model performance table
+        if self.training_metrics:
+            print(f"\n📈 MODEL PERFORMANCE METRICS:")
+            print("-" * 50)
+            
+            metrics_data = {
+                'Metric': ['Training R²', 'Test R²', 'Training RMSE', 'Test RMSE', 'CV Mean R²', 'CV Std R²'],
+                'Value': [
+                    f"{self.training_metrics.get('train_r2', 0):.4f}",
+                    f"{self.training_metrics.get('test_r2', 0):.4f}",
+                    f"{self.training_metrics.get('train_rmse', 0):.4f}°C",
+                    f"{self.training_metrics.get('test_rmse', 0):.4f}°C",
+                    f"{np.mean(self.training_metrics.get('cv_scores', [0])):.4f}",
+                    f"{np.std(self.training_metrics.get('cv_scores', [0])):.4f}"
+                ]
+            }
+            
+            metrics_df = pd.DataFrame(metrics_data)
+            print(metrics_df.to_string(index=False, justify='left'))
         
-        # Scatter plot: Impervious surface vs UHI
-        axes[1, 0].scatter(
-            df['impervious_surface_percentage'], 
-            predictions, 
-            alpha=0.5, 
-            s=1
-        )
-        axes[1, 0].set_xlabel('Impervious Surface Percentage (%)')
-        axes[1, 0].set_ylabel('UHI Intensity (°C)')
-        axes[1, 0].set_title('Impervious Surface vs UHI Intensity')
-        axes[1, 0].grid(True, alpha=0.3)
+        # UHI intensity categories table
+        print(f"\n🌡️  UHI INTENSITY CATEGORIES:")
+        print("-" * 50)
         
-        # Scatter plot: NDVI vs UHI
-        axes[1, 1].scatter(df['ndvi'], predictions, alpha=0.5, s=1)
-        axes[1, 1].set_xlabel('NDVI (Vegetation Index)')
-        axes[1, 1].set_ylabel('UHI Intensity (°C)')
-        axes[1, 1].set_title('Vegetation Index vs UHI Intensity')
-        axes[1, 1].grid(True, alpha=0.3)
+        # Define UHI categories
+        categories = []
+        low_count = np.sum(predictions < 2)
+        medium_count = np.sum((predictions >= 2) & (predictions < 4))
+        high_count = np.sum((predictions >= 4) & (predictions < 6))
+        extreme_count = np.sum(predictions >= 6)
         
-        plt.tight_layout()
-        plt.savefig('uhi_analysis_results.png', dpi=300, bbox_inches='tight')
-        plt.show()
+        category_data = {
+            'Category': ['Low (< 2°C)', 'Medium (2-4°C)', 'High (4-6°C)', 'Extreme (≥ 6°C)'],
+            'Count': [low_count, medium_count, high_count, extreme_count],
+            'Percentage': [
+                f"{(low_count/len(predictions)*100):.1f}%",
+                f"{(medium_count/len(predictions)*100):.1f}%", 
+                f"{(high_count/len(predictions)*100):.1f}%",
+                f"{(extreme_count/len(predictions)*100):.1f}%"
+            ]
+        }
         
-        return fig
+        category_df = pd.DataFrame(category_data)
+        print(category_df.to_string(index=False, justify='left'))
+        
+        # Correlation table (if features available)
+        if len(df.select_dtypes(include=[np.number]).columns) > 1:
+            print(f"\n🔗 FEATURE CORRELATION WITH UHI INTENSITY:")
+            print("-" * 60)
+            
+            # Calculate correlations
+            numeric_df = df.select_dtypes(include=[np.number]).copy()
+            numeric_df['uhi_intensity'] = predictions
+            correlations = numeric_df.corr()['uhi_intensity'].drop('uhi_intensity')
+            
+            # Sort by absolute correlation
+            correlations_sorted = correlations.abs().sort_values(ascending=False)
+            
+            corr_data = []
+            for feature in correlations_sorted.index:
+                corr_val = correlations[feature]
+                corr_data.append({
+                    'Feature': feature.replace('_', ' ').title(),
+                    'Correlation': f"{corr_val:.4f}",
+                    'Strength': 'Strong' if abs(corr_val) > 0.6 else 'Medium' if abs(corr_val) > 0.3 else 'Weak',
+                    'Direction': 'Positive' if corr_val > 0 else 'Negative'
+                })
+            
+            corr_df = pd.DataFrame(corr_data)
+            print(corr_df.to_string(index=False, justify='left'))
+        
+        print("\n" + "="*80)
+
+# Example usage and demonstration
 
 # Example usage and demonstration
 def main():
@@ -367,19 +437,24 @@ def main():
     print("\n2. Training the UHI prediction model...")
     X_test, y_test, y_pred_test = uhi_model.train_model(training_data, model_type='random_forest')
     
-    # Generate factor importance output (as specified in requirements)
+    """# Generate factor importance output (as specified in requirements)
     print("\n3. Generating factor importance ranking...")
     factor_output = uhi_model.generate_factor_importance_output('uhi_factor_importance.json')
-    
+   
     # Display top factors
     print("\nTop 5 Most Important Factors:")
     for i, factor in enumerate(factor_output['factor_importance'][:5]):
         print(f"{i+1}. {factor['factor']}: {factor['score']:.3f}")
-    
+    """
     # Create predictions for visualization
     print("\n4. Creating predictions for full dataset...")
-    all_predictions = uhi_model.predict_uhi_intensity(training_data)
-    
+    try:
+        all_predictions = uhi_model.predict_uhi_intensity(self, training_data)
+        print(f"✅ Generated {len(all_predictions)} predictions")
+    except Exception as e:
+        print(f"❌ Prediction error: {e}")
+        # Use test predictions as fallback
+        all_predictions = y_pred_test
     # Create raster outputs
     print("\n5. Creating GeoTIFF raster outputs...")
     coordinates = training_data[['lat', 'lon']]
@@ -396,11 +471,9 @@ def main():
         highway_buffer_km=0.5,
         output_path='highway_heat_map.tif'
     )
-    
-    # Create visualizations
-    print("\n7. Creating analysis visualizations...")
-    uhi_model.visualize_results(training_data, all_predictions)
-    
+    print("\n7. View the results...")
+    results=uhi_model.create_results_table(self, df, predictions)
+
     # Summary statistics
     print(f"\n=== Model Summary ===")
     print(f"Model Type: {type(uhi_model.model).__name__}")
@@ -430,4 +503,12 @@ def main():
 
 if __name__ == "__main__":
     # Run the complete workflow
-    model, data, predictions = main()
+    try:
+        model, data, predictions = main()
+        if model is not None:
+            print("\n Workflow completed successfully!")
+        else:
+            print("\n  Workflow completed with some issues - check messages above")
+    except Exception as e:
+        print(f"\n Workflow failed: {e}")
+        print("Try running the code in smaller sections to identify the issue")
